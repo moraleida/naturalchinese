@@ -1,84 +1,57 @@
 package feedReader
 
 import (
+	"cloud.google.com/go/storage"
 	"context"
-	"encoding/base64"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/mmcdole/gofeed"
-
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
+	"log"
 )
 
 func init() {
 	functions.CloudEvent("IngestFeed", ingestFeed)
 }
 
-type PubSubEvent struct {
-	Message struct {
-		Data       string
-		Attributes string
-	}
-	Subscription string
-}
+func getBucket(ctx context.Context) (*storage.BucketHandle, string) {
+	storageclient, storageerr := storage.NewClient(ctx)
 
-type RSSPost struct {
-	Channel struct {
-		Posts []struct {
-			Title    string   `xml:"title"`
-			Link     string   `xml:"link"`
-			Category []string `xml:"category"`
-			PubDate  string   `xml:"pubDate"`
-			Updated  string   `xml:"updated"`
-			Encoded  string   `xml:"encoded"`
-			Content  string   `xml:"content"`
-		} `xml:"item"`
-	} `xml:"channel"`
-}
-
-/**
- * sample data for testing purposes
- */
-func getBody() []byte {
-	return []byte(`{
-			"message": {
-			  "data": "d29ybGQ=",
-			  "attributes": {
-				 "attr1":"attr1-value"
-			  }
-			},
-			"subscription": "projects/MY-PROJECT/subscriptions/MY-SUB"
-		  }`)
-}
-
-// Decode the json object
-func getJSON(data []byte) map[string]interface{} {
-	jsonMap := make(map[string]interface{})
-	err := json.Unmarshal(data, &jsonMap)
-
-	if err != nil {
-		panic("malformed input")
+	if storageerr != nil {
+		log.Fatal(storageerr)
 	}
 
-	return jsonMap
+	bucketName := "natural-chinese-raw-files"
+
+	return storageclient.Bucket(bucketName), bucketName
 }
 
-// Parse the json object and return the expected feed URL
-func ingest(data []byte) string {
-	jsonBody := getJSON(data) // map[string]interface{}
+func getObjectHashString(el *gofeed.Item) string {
+	jsonObj, _ := json.Marshal(el)
+	objHash := md5.Sum(jsonObj)
+	return hex.EncodeToString(objHash[:])
+}
 
-	// message
-	messageKeyValue := jsonBody["message"].(map[string]interface{}) // map[string]interface{}
-	// data key
-	dataKeyValue := messageKeyValue["data"].(string)                  // string
-	decodedData, err := base64.StdEncoding.DecodeString(dataKeyValue) // []byte
+func writeObject(hash string, ctx context.Context, bucket *storage.BucketHandle) {
+	newObj := bucket.Object(hash)
+	w := newObj.NewWriter(ctx)
 
-	if err != nil {
-		panic("unable to decode data")
+	decoded, decodeerr := hex.DecodeString(hash)
+
+	if decodeerr != nil {
+		log.Fatal(decodeerr)
 	}
 
-	return fmt.Sprintf("%q", decodedData)
+	if _, writerr := fmt.Fprintf(w, "%q", string(decoded)); writerr != nil {
+		log.Fatal(writerr)
+	}
+
+	if closeerr := w.Close(); closeerr != nil {
+		log.Fatal(closeerr)
+	}
 }
 
 // Entry point for Cloud Function
@@ -87,15 +60,18 @@ func ingestFeed(ctx context.Context, e event.Event) error {
 	fp := gofeed.NewParser()
 	//	feed, _ := fp.ParseURL(feedURL)
 	feed, _ := fp.ParseURL("http://www.xinhuanet.com/politics/news_politics.xml")
-	var count = 0
+	bucket, bucketName := getBucket(ctx)
 
 	for _, element := range feed.Items {
-		jsonObj, _ := json.Marshal(element)
+		hashString := getObjectHashString(element)
+		_, attrserr := bucket.Object(hashString).Attrs(ctx)
 
-		fmt.Println(count)
-		fmt.Printf("%s\n\n", string(jsonObj))
+		if attrserr != storage.ErrObjectNotExist {
+			continue
+		}
 
-		count++
+		writeObject(hashString, ctx, bucket)
+		log.Println("INFO: stored " + element.Link + "|" + hashString + "|" + bucketName)
 	}
 
 	return nil

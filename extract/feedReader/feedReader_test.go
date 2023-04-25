@@ -1,12 +1,16 @@
 package feedReader
 
-import (
-	"fmt"
-	"testing"
-)
-
-func TestFeedReader(t *testing.T) {
-	result := ingest()
-
-	fmt.Printf("%q\n", result)
+/**
+ * sample data for testing purposes
+ */
+func getBody() []byte {
+	return []byte(`{
+			"message": {
+			  "data": "d29ybGQ=",
+			  "attributes": {
+				 "attr1":"attr1-value"
+			  }
+			},
+			"subscription": "projects/MY-PROJECT/subscriptions/MY-SUB"
+		  }`)
 }
