@@ -3,5 +3,5 @@ venv
 .idea
 *.iml
 sources
-extract/feedReader/cmd
-extract/feedReader/*.sh
+extract/feedreader/cmd
+extract/feedreader/*.sh
