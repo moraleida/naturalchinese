@@ -1,4 +1,4 @@
-package feedReader
+package feedreader
 
 import (
 	"cloud.google.com/go/storage"
@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	functions.CloudEvent("IngestFeed", ingestFeed)
+	functions.CloudEvent("ingestFeed", ingestFeed)
 }
 
 func getBucket(ctx context.Context) (*storage.BucketHandle, string) {
@@ -24,7 +24,7 @@ func getBucket(ctx context.Context) (*storage.BucketHandle, string) {
 		log.Fatal(storageerr)
 	}
 
-	bucketName := "natural-chinese-raw-files"
+	bucketName := "natural-chinese-ingest-feedreader-raw-files"
 
 	return storageclient.Bucket(bucketName), bucketName
 }

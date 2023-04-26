@@ -1,12 +1,18 @@
 INTEGRATION_TEST_PATH?=./it
 
-docker.build:
-	pack build --builder gcr.io/buildpacks/builder:v1 --env GOOGLE_FUNCTION_SIGNATURE_TYPE=cloudevent --env GOOGLE_FUNCTION_TARGET=IngestFeed naturalchinese.com/ingest
+build:
+	pack build --builder gcr.io/buildpacks/builder:v1 --env GOOGLE_FUNCTION_SIGNATURE_TYPE=cloudevent --env GOOGLE_FUNCTION_TARGET=ingestFeed naturalchinese.com/ingest
 
-docker.start.components:
+run:
+	docker run --rm -p 8080:8080 naturalchinese.com/ingest
+
+test:
+	./test.sh
+
+test.start:
 	docker-compose up -d --remove-orphans
 
-docker.stop:
+test.stop:
 	docker-compose down
 
 test.integration:

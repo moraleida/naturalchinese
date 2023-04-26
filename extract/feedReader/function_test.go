@@ -1,4 +1,4 @@
-package feedReader
+package feedreader
 
 /**
  * sample data for testing purposes
