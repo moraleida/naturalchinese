@@ -1,17 +1,3 @@
-/*
-resource "google_cloud_run_service" "scheduler_service" {
-  location = var.region
-  name     = "${var.project_name}-service_feedreader-service"
-
-  template {
-    spec {
-      containers {
-        image = ""
-      }
-    }
-  }
-}
-*/
 // Define the PubSub topic that will be used to trigger the Cloud Function
 resource "google_pubsub_topic" "service_feedreader_topic" {
   project = var.project_id
@@ -28,13 +14,11 @@ resource "google_eventarc_trigger" "feedreader_trigger" {
   }
 
   destination {
-    /*
-    cloud_run_service {
-      service = google_cloud_run_service.scheduler_service.name
-      region  = google_cloud_run_service.scheduler_service.location
-    }
-    */
     cloud_function = google_cloudfunctions2_function.service_feedreader_function.name
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

@@ -45,4 +45,8 @@ resource "google_cloudfunctions2_function" "service_feedreader_function" {
     available_memory   = "256M"
     timeout_seconds    = 60
   }
+
+  lifecycle {
+    replace_triggered_by = [ google_storage_bucket_object.service_feedreader_object.id ]
+  }
 }
