@@ -22,3 +22,8 @@ variable "module_name" {
   type = string
   default = "default"
 }
+
+variable "xinhua_feed" {
+  type = string
+  default = "http://www.xinhuanet.com/politics/news_politics.xml"
+}

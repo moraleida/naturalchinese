@@ -7,6 +7,7 @@ package feedreader
 import (
 	"context"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -18,12 +19,13 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-// Default function for implementing GCP Cloud Functions.
+// init is the default function for implementing GCP Cloud Functions.
 // This should not be changed unless the ingestFeed func signature changes.
 func init() {
 	functions.CloudEvent("ingestFeed", ingestFeed)
 }
 
+// getBucket returns the Bucket client for storing objects
 func getBucket(ctx context.Context) (*storage.BucketHandle, string) {
 	storageclient, storageerr := storage.NewClient(ctx)
 
@@ -36,17 +38,21 @@ func getBucket(ctx context.Context) (*storage.BucketHandle, string) {
 	return storageclient.Bucket(bucketName), bucketName
 }
 
+// getObjectHashString returns an md5 hash of the RSS Item content meant to be used as the Object name
 func getObjectHashString(el *gofeed.Item) string {
 	jsonObj, _ := json.Marshal(el)
 	objHash := md5.Sum(jsonObj)
 	return hex.EncodeToString(objHash[:])
 }
 
+// getObjectContent returns the string representation of the json object for a specific RSS Item
 func getObjectContent(el *gofeed.Item) string {
 	jsonObj, _ := json.Marshal(el)
 	return string(jsonObj)
 }
 
+// writeObjectToBucket creates a new Object with the content hash as its name and the text representation
+// of the json object for the RSS Item as the content
 func writeObjectToBucket(hash string, content string, ctx context.Context, bucket *storage.BucketHandle) {
 	newObj := bucket.Object(hash)
 	w := newObj.NewWriter(ctx)
@@ -60,10 +66,10 @@ func writeObjectToBucket(hash string, content string, ctx context.Context, bucke
 	}
 }
 
-/**
- *	Entry point for Cloud Function
- *  This function expects a PubSub Event containing a Feed URL in the message.data field. It will read the contents of the feed and create/update any objects in the Raw Objects bucket with their contents.
- */
+// ingestFeed is the entry point for this Cloud Function
+// This func expects a PubSub Event containing a Feed URL in the message.data field.
+// It will read the contents of the feed and create any objects in the Raw Objects
+// bucket with their contents.
 func ingestFeed(ctx context.Context, e event.Event) error {
 	// Uncomment for local testing
 	// _ := os.Setenv("STORAGE_EMULATOR_HOST", "localhost:9023")
@@ -71,7 +77,8 @@ func ingestFeed(ctx context.Context, e event.Event) error {
 
 	//	feedURL := ingest(e.Data())
 	fp := gofeed.NewParser()
-	feed, _ := fp.ParseURL("http://www.xinhuanet.com/politics/news_politics.xml")
+	feedurl, _ := base64.StdEncoding.DecodeString(string(e.Data()))
+	feed, _ := fp.ParseURL(string(feedurl))
 	bucket, bucketName := getBucket(ctx)
 
 	for _, element := range feed.Items {
@@ -80,7 +87,7 @@ func ingestFeed(ctx context.Context, e event.Event) error {
 
 		_, attrserr := bucket.Object(hashString).Attrs(ctx)
 		if attrserr != storage.ErrObjectNotExist {
-			log.Println("LOG: STORAGE ERROR: " + attrserr.Error())
+			// Do not recreate objects if their hashes didn't change
 			continue
 		}
 

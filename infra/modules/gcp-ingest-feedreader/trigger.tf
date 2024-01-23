@@ -21,16 +21,3 @@ resource "google_eventarc_trigger" "feedreader_trigger" {
     create_before_destroy = true
   }
 }
-
-resource "google_cloud_scheduler_job" "trigger_scheduler" {
-  name        = "${var.project_name}-service_feedreader-trigger-scheduler"
-  description = "Triggers the feedReader service"
-  schedule    = "*/20 * * * *" // run every 20 minutes
-  project     = var.project_id
-  region      = var.region
-
-  pubsub_target {
-    topic_name = google_pubsub_topic.service_feedreader_topic.id
-    data       = base64encode(formatdate("DD MMM YYYY hh:mm ZZZ", timestamp()))
-  }
-}

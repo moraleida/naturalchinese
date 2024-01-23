@@ -1,13 +1,6 @@
 data "local_file" "source" {
   filename = "${path.cwd}/sources/feedreader.zip"
 }
-/*
-
-resource "local_file" "feedreader_source" {
-  filename = "${path.module}/service_feedreader_function.zip"
-  source = "../../../extract/feedReader/feedreader.zip"
-}
-*/
 
 // Publish the function code to the appropriate storage
 resource "google_storage_bucket_object" "service_feedreader_object" {
